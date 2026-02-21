@@ -1,0 +1,34 @@
+{
+  "_comment": "EventBridge rule - alternative trigger method. You can use EITHER S3 Event Notification (simpler) OR EventBridge (more flexible). See the deployment guide for which to choose.",
+
+  "EventBridgeRule": {
+    "Name": "nextflow-csv-upload-trigger",
+    "Description": "Triggers when a .csv file is uploaded to s3://seqwell-stepfunction/",
+    "EventBusName": "default",
+    "State": "ENABLED",
+    "EventPattern": {
+      "source": ["aws.s3"],
+      "detail-type": ["Object Created"],
+      "detail": {
+        "bucket": {
+          "name": ["seqwell-stepfunction"]
+        },
+        "object": {
+          "key": [{"suffix": ".csv"}]
+        }
+      }
+    }
+  },
+
+  "EventBridgeTarget": {
+    "Rule": "nextflow-csv-upload-trigger",
+    "Targets": [
+      {
+        "Id": "trigger-nextflow-lambda",
+        "Arn": "arn:aws:lambda:us-east-2:YOUR_ACCOUNT_ID:function:trigger-nextflow-stepfunction"
+      }
+    ]
+  },
+
+  "_note_on_s3_eventbridge": "For EventBridge to receive S3 events, you MUST enable S3 EventBridge notifications on the bucket. See the deployment guide Step 2."
+}

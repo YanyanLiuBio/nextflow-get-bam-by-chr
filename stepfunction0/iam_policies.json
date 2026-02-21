@@ -1,0 +1,219 @@
+{
+  "_comment": "IAM Policies for Nextflow Automation Stack",
+  "_instructions": "Create these policies in AWS IAM console, then attach to the appropriate roles",
+
+  "1_lambda_trigger_policy": {
+    "_attach_to": "Role: nextflow-trigger-lambda-role",
+    "_description": "Policy for the Lambda that reads CSV from S3 and starts Step Function",
+    "PolicyName": "nextflow-trigger-lambda-policy",
+    "PolicyDocument": {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Sid": "ReadTriggerBucket",
+          "Effect": "Allow",
+          "Action": [
+            "s3:GetObject",
+            "s3:ListBucket"
+          ],
+          "Resource": [
+            "arn:aws:s3:::seqwell-stepfunction",
+            "arn:aws:s3:::seqwell-stepfunction/*"
+          ]
+        },
+        {
+          "Sid": "StartStepFunction",
+          "Effect": "Allow",
+          "Action": "states:StartExecution",
+          "Resource": "arn:aws:states:us-east-2:YOUR_ACCOUNT_ID:stateMachine:nextflow-pipeline"
+        },
+        {
+          "Sid": "CloudWatchLogs",
+          "Effect": "Allow",
+          "Action": [
+            "logs:CreateLogGroup",
+            "logs:CreateLogStream",
+            "logs:PutLogEvents"
+          ],
+          "Resource": "arn:aws:logs:us-east-2:YOUR_ACCOUNT_ID:log-group:/aws/lambda/*"
+        }
+      ]
+    }
+  },
+
+  "2_run_nextflow_lambda_policy": {
+    "_attach_to": "Role: nextflow-run-lambda-role",
+    "_description": "Policy for the Lambda that sends SSM command to EC2",
+    "PolicyName": "nextflow-run-lambda-policy",
+    "PolicyDocument": {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Sid": "SendSSMCommand",
+          "Effect": "Allow",
+          "Action": [
+            "ssm:SendCommand",
+            "ssm:GetCommandInvocation",
+            "ssm:ListCommandInvocations"
+          ],
+          "Resource": [
+            "arn:aws:ssm:us-east-2:YOUR_ACCOUNT_ID:document/AWS-RunShellScript",
+            "arn:aws:ec2:us-east-2:YOUR_ACCOUNT_ID:instance/YOUR_EC2_INSTANCE_ID",
+            "arn:aws:ssm:us-east-2:YOUR_ACCOUNT_ID:*"
+          ]
+        },
+        {
+          "Sid": "CloudWatchLogs",
+          "Effect": "Allow",
+          "Action": [
+            "logs:CreateLogGroup",
+            "logs:CreateLogStream",
+            "logs:PutLogEvents"
+          ],
+          "Resource": "arn:aws:logs:us-east-2:YOUR_ACCOUNT_ID:log-group:/aws/lambda/*"
+        },
+        {
+          "Sid": "SSMCloudWatchLogs",
+          "Effect": "Allow",
+          "Action": [
+            "logs:CreateLogGroup",
+            "logs:CreateLogStream",
+            "logs:PutLogEvents"
+          ],
+          "Resource": "arn:aws:logs:us-east-2:YOUR_ACCOUNT_ID:log-group:/nextflow-automation/*"
+        }
+      ]
+    }
+  },
+
+  "3_check_status_lambda_policy": {
+    "_attach_to": "Role: nextflow-check-lambda-role  (can reuse nextflow-run-lambda-role)",
+    "_description": "Policy for the Lambda that checks pipeline status",
+    "PolicyName": "nextflow-check-lambda-policy",
+    "PolicyDocument": {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Sid": "CheckSSMCommand",
+          "Effect": "Allow",
+          "Action": [
+            "ssm:GetCommandInvocation",
+            "ssm:ListCommandInvocations"
+          ],
+          "Resource": "*"
+        },
+        {
+          "Sid": "CheckS3Outputs",
+          "Effect": "Allow",
+          "Action": [
+            "s3:ListBucket",
+            "s3:GetObject"
+          ],
+          "Resource": [
+            "arn:aws:s3:::seqwell-users",
+            "arn:aws:s3:::seqwell-users/*"
+          ]
+        },
+        {
+          "Sid": "CloudWatchLogs",
+          "Effect": "Allow",
+          "Action": [
+            "logs:CreateLogGroup",
+            "logs:CreateLogStream",
+            "logs:PutLogEvents"
+          ],
+          "Resource": "arn:aws:logs:us-east-2:YOUR_ACCOUNT_ID:log-group:/aws/lambda/*"
+        }
+      ]
+    }
+  },
+
+  "4_step_function_policy": {
+    "_attach_to": "Role: nextflow-stepfunction-role",
+    "_description": "Policy for the Step Function to invoke Lambda and SNS",
+    "PolicyName": "nextflow-stepfunction-policy",
+    "PolicyDocument": {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Sid": "InvokeLambdas",
+          "Effect": "Allow",
+          "Action": "lambda:InvokeFunction",
+          "Resource": [
+            "arn:aws:lambda:us-east-2:YOUR_ACCOUNT_ID:function:run-nextflow",
+            "arn:aws:lambda:us-east-2:YOUR_ACCOUNT_ID:function:check-nextflow-status"
+          ]
+        },
+        {
+          "Sid": "PublishSNS",
+          "Effect": "Allow",
+          "Action": "sns:Publish",
+          "Resource": "arn:aws:sns:us-east-2:YOUR_ACCOUNT_ID:nextflow-notifications"
+        },
+        {
+          "Sid": "CloudWatchLogs",
+          "Effect": "Allow",
+          "Action": [
+            "logs:CreateLogDelivery",
+            "logs:GetLogDelivery",
+            "logs:UpdateLogDelivery",
+            "logs:DeleteLogDelivery",
+            "logs:ListLogDeliveries",
+            "logs:PutResourcePolicy",
+            "logs:DescribeResourcePolicies",
+            "logs:DescribeLogGroups"
+          ],
+          "Resource": "*"
+        }
+      ]
+    }
+  },
+
+  "5_ec2_instance_profile_additions": {
+    "_attach_to": "Your existing EC2 instance profile (the one attached to your Nextflow EC2)",
+    "_description": "Additional permissions EC2 needs for Nextflow to run properly",
+    "PolicyName": "nextflow-ec2-additions",
+    "PolicyDocument": {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Sid": "S3WorkDir",
+          "Effect": "Allow",
+          "Action": [
+            "s3:GetObject",
+            "s3:PutObject",
+            "s3:DeleteObject",
+            "s3:ListBucket"
+          ],
+          "Resource": [
+            "arn:aws:s3:::seqwell-users",
+            "arn:aws:s3:::seqwell-users/*"
+          ]
+        },
+        {
+          "Sid": "BatchForNextflow",
+          "Effect": "Allow",
+          "Action": [
+            "batch:SubmitJob",
+            "batch:DescribeJobs",
+            "batch:TerminateJob",
+            "batch:CancelJob"
+          ],
+          "Resource": "*"
+        },
+        {
+          "Sid": "SSMAgentCommunication",
+          "Effect": "Allow",
+          "Action": [
+            "ssm:UpdateInstanceInformation",
+            "ssmmessages:CreateControlChannel",
+            "ssmmessages:CreateDataChannel",
+            "ssmmessages:OpenControlChannel",
+            "ssmmessages:OpenDataChannel"
+          ],
+          "Resource": "*"
+        }
+      ]
+    }
+  }
+}

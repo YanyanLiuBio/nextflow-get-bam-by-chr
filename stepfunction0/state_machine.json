@@ -1,0 +1,132 @@
+{
+  "Comment": "Nextflow pipeline orchestration - runs nextflow on EC2 via SSM Run Command",
+  "StartAt": "ValidateInput",
+  "States": {
+
+    "ValidateInput": {
+      "Type": "Pass",
+      "Comment": "Pass-through validation step. Add a Lambda here if you want custom validation logic.",
+      "Next": "NotifyStart"
+    },
+
+    "NotifyStart": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+        "TopicArn": "${SNS_TOPIC_ARN}",
+        "Subject": "Nextflow Pipeline Started",
+        "Message.$": "States.Format('Nextflow pipeline started.\nRun: {}\nAnalysis: {}\nChr: {}\nDev: {}', $.run, $.analysis, $.chr, $.dev)"
+      },
+      "Next": "RunNextflow",
+      "ResultPath": "$.sns_start_result"
+    },
+
+    "RunNextflow": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${RUN_NEXTFLOW_LAMBDA_ARN}",
+        "Payload.$": "$"
+      },
+      "ResultPath": "$.nextflow_result",
+      "Retry": [
+        {
+          "ErrorEquals": ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"],
+          "IntervalSeconds": 30,
+          "MaxAttempts": 2,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "NotifyFailure",
+          "ResultPath": "$.error"
+        }
+      ],
+      "Next": "WaitForNextflow"
+    },
+
+    "WaitForNextflow": {
+      "Type": "Wait",
+      "Comment": "Wait 5 minutes before checking pipeline status. Adjust as needed.",
+      "Seconds": 300,
+      "Next": "CheckNextflowStatus"
+    },
+
+    "CheckNextflowStatus": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${CHECK_STATUS_LAMBDA_ARN}",
+        "Payload.$": "$"
+      },
+      "ResultPath": "$.status_check",
+      "Retry": [
+        {
+          "ErrorEquals": ["Lambda.ServiceException"],
+          "IntervalSeconds": 30,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "NotifyFailure",
+          "ResultPath": "$.error"
+        }
+      ],
+      "Next": "IsComplete"
+    },
+
+    "IsComplete": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.status_check.Payload.status",
+          "StringEquals": "SUCCEEDED",
+          "Next": "NotifySuccess"
+        },
+        {
+          "Variable": "$.status_check.Payload.status",
+          "StringEquals": "FAILED",
+          "Next": "NotifyFailure"
+        }
+      ],
+      "Default": "WaitForNextflow"
+    },
+
+    "NotifySuccess": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+        "TopicArn": "${SNS_TOPIC_ARN}",
+        "Subject": "✅ Nextflow Pipeline SUCCEEDED",
+        "Message.$": "States.Format('Nextflow pipeline completed successfully!\nRun: {}\nAnalysis: {}\nChr: {}\nOutput: s3://seqwell-users/{}/nextflow-work-dir/', $.run, $.analysis, $.chr, $.run)"
+      },
+      "Next": "PipelineSuccess"
+    },
+
+    "NotifyFailure": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+        "TopicArn": "${SNS_TOPIC_ARN}",
+        "Subject": "❌ Nextflow Pipeline FAILED",
+        "Message.$": "States.Format('Nextflow pipeline FAILED.\nRun: {}\nAnalysis: {}\nChr: {}\nPlease check CloudWatch logs for details.', $.run, $.analysis, $.chr)"
+      },
+      "Next": "PipelineFailed"
+    },
+
+    "PipelineSuccess": {
+      "Type": "Succeed"
+    },
+
+    "PipelineFailed": {
+      "Type": "Fail",
+      "Error": "NextflowPipelineFailed",
+      "Cause": "The Nextflow pipeline did not complete successfully"
+    }
+  }
+}
