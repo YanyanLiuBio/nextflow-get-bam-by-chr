@@ -25,7 +25,7 @@
           "Sid": "StartStepFunction",
           "Effect": "Allow",
           "Action": "states:StartExecution",
-          "Resource": "arn:aws:states:us-east-2:YOUR_ACCOUNT_ID:stateMachine:nextflow-pipeline"
+          "Resource": "arn:aws:states:us-east-2:512431263418:stateMachine:nextflow-pipeline"
         },
         {
           "Sid": "CloudWatchLogs",
@@ -35,7 +35,7 @@
             "logs:CreateLogStream",
             "logs:PutLogEvents"
           ],
-          "Resource": "arn:aws:logs:us-east-2:YOUR_ACCOUNT_ID:log-group:/aws/lambda/*"
+          "Resource": "arn:aws:logs:us-east-2:512431263418:log-group:/aws/lambda/*"
         }
       ]
     }
@@ -140,15 +140,15 @@
           "Effect": "Allow",
           "Action": "lambda:InvokeFunction",
           "Resource": [
-            "arn:aws:lambda:us-east-2:YOUR_ACCOUNT_ID:function:run-nextflow",
-            "arn:aws:lambda:us-east-2:YOUR_ACCOUNT_ID:function:check-nextflow-status"
+            "arn:aws:lambda:us-east-2:512431263418:function:run-nextflow",
+            "arn:aws:lambda:us-east-2:512431263418:function:check-nextflow-status"
           ]
         },
         {
           "Sid": "PublishSNS",
           "Effect": "Allow",
           "Action": "sns:Publish",
-          "Resource": "arn:aws:sns:us-east-2:YOUR_ACCOUNT_ID:nextflow-notifications"
+          "Resource": "arn:aws:sns:us-east-2:512431263418:nextflow-notifications"
         },
         {
           "Sid": "CloudWatchLogs",
