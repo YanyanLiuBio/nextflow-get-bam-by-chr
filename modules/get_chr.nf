@@ -2,7 +2,7 @@ process get_chr {
 
     tag "${pair_id}"
 
-    publishDir path: "s3://${path_s3}/${params.run}/glimpse_impute/${params.analysis}/bam_by_chr/${params.chr}",
+    publishDir path: "s3://${params.path_s3}/${params.run}/glimpse_impute/${params.analysis}/bam_by_chr/${params.chr}",
                mode: 'copy'
 
     input:

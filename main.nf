@@ -5,7 +5,7 @@ include { get_chr } from './modules/get_chr.nf'
 workflow {
 
     // Resolve S3 base path
-    def path_s3 = params.dev ? "seqwell-dev/analysis" : "seqwell-analysis"
+    params.path_s3 = params.dev.toBoolean() ? "seqwell-dev/analysis" : "seqwell-analysis"
 
     bam_ch = Channel
         .fromPath("s3://seqwell-analysis/${params.run}/${params.analysis}/bam/*.md.bam")
